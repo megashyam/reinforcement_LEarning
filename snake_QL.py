@@ -9,10 +9,7 @@ import time
 
 from collections import deque
 
-
-
 # --- CONSTANTS AND CONFIG ---
-
 style.use('ggplot')
 
 # Environment settings
@@ -37,8 +34,6 @@ FOOD_REWARD=25
 show_every = 5000
 start_q_table = None 
 
-
-
 SNAKE_N=1
 FOOD_N=2
 BODY_N=3
@@ -50,14 +45,12 @@ d={
     3:(30, 144, 255)
 }
 
-
 class Snake:
     def __init__(self):
         self.x=np.random.randint(0,SIZE) 
         self.y=np.random.randint(0,SIZE)
         self.body=deque()
         self.growing=False
-
 
     def action(self, choice):
         if choice==0:
@@ -86,16 +79,11 @@ class Snake:
         else:
             self.growing=False
 
-
-
-
     def grow(self):
         self.growing=True
 
-
     def collide(self):
         return (self.x,self.y) in self.body
-
 
 class Food:
     def __init__(self, snake=None):
@@ -106,7 +94,6 @@ class Food:
 
         self.respawn(snake_body)
 
-
     def respawn(self, snake_body):
         while True:
             self.x=np.random.randint(0,SIZE) 
@@ -114,9 +101,6 @@ class Food:
             
             if (self.x,self.y) not in snake_body:
                 break
-
-
-
 
 def get_q_table(path):
 
@@ -136,8 +120,6 @@ def get_q_table(path):
                                 q_table[state] = [np.random.uniform(-5, 0) for _ in range(4)]
 
     return q_table
-
-
 
 def get_state(snake, food):
 
@@ -193,6 +175,7 @@ def draw_environment(food, snake, episode, episode_reward, state_flag):
 
 
 
+
 if __name__=="__main__":
 
     q_table=get_q_table(start_q_table)
@@ -208,11 +191,8 @@ if __name__=="__main__":
         if show:
             print(f"## ON EPISODE {episode}, EPSILON: {epsilon}")
     
-
         episode_reward=0
         done=False
-
-        
 
         for i in range(STEPS):
             obs=get_state(snake,food)
