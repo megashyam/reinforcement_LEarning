@@ -9,7 +9,7 @@ enable_double_dqn: True
 enable_dueling_dqn: True
 total_steps_per_episode: 10000
 total_episodes: 1000
-min_epsilon: 0.03
+min_epsilon: 0.02
 show_every: 50
 render: True
 fc_dueling: 64
