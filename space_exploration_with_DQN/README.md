@@ -1,6 +1,15 @@
 # 🚀 LunarLander DQN Agent
 
-A **PyTorch-based Deep Q-Learning agent** for solving the [LunarLander-v3](https://gymnasium.farama.org/environments/box2d/lunar_lander/) environment using advanced RL techniques like **Double DQN**, **Dueling DQN**, **Experience Replay**, and **Target Networks**. Supports full training and evaluation with live epsilon decay tracking and model saving.
+A **PyTorch-based Deep Q-Learning agent** for solving the [LunarLander-v3](https://gymnasium.farama.org/environments/box2d/lunar_lander/) environment **Double DQN**, **Dueling DQN**, **Experience Replay**, and **Target Networks**. Supports full training and evaluation with live epsilon decay tracking and model saving.
+
+### Concept Overview
+
+The LunarLander environment challenges an agent to land a spacecraft safely between two flags on the moon’s surface. Rewards are based on:
+
+- Successful soft landing (+100 to +140)
+- Crashing (-100)
+- Firing engines (-0.3 per frame)
+- Moving closer to the landing pad
 
 ![LunarLander Demo](https://user-images.githubusercontent.com/63813881/230761198-1b263b57-1a5e-45d3-983f-9b08f46e28a1.gif)
 
@@ -10,21 +19,6 @@ A **PyTorch-based Deep Q-Learning agent** for solving the [LunarLander-v3](https
 - **Double DQN** - Reduces Q-value overestimation
 - **Prioritized Experience Replay** - Efficient sampling of experiences
 - **ε-Greedy Exploration** - With annealing schedule
-- **Modular Design** - Easy to extend and modify
-
-
-
-## Concept Overview
-
-The LunarLander environment challenges an agent to land a spacecraft safely between two flags on the moon’s surface. Rewards are based on:
-
-- Successful soft landing (+100 to +140)
-- Crashing (-100)
-- Firing engines (-0.3 per frame)
-- Moving closer to the landing pad
-
-
-
 
 ## What is Deep Q-Network (DQN)?
 
@@ -50,10 +44,8 @@ Double DQN improves upon regular DQN by addressing the problem of **overestimati
 ### Overestimation Bias in Regular DQN
 
 Regular DQN uses the same network both to select and evaluate the best next action:
-![Double DQN](https://www.google.com/url?sa=i&url=https%3A%2F%2Fmedium.com%2F%40qempsil0914%2Fdeep-q-learning-part2-double-deep-q-network-double-dqn-b8fc9212bbb2&psig=AOvVaw3AmCGLPuTddSYs-Vy1nyV1&ust=1753054480945000&source=images&cd=vfe&opi=89978449&ved=0CBYQjRxqFwoTCOjhioCLyo4DFQAAAAAdAAAAABAE)
-\[
-\text{target} = r + \gamma \max_{a'} Q(s', a'; \theta)
-\]
+
+![Double DQN](https://github.com/megashyam/reinforcement_LEarning/blob/main/space_exploration_with_DQN/Viz/1_nm0lt3oobxdBHTMACUZ-cg.png)
 
 This can lead to overoptimistic value estimates, harming learning stability.
 
@@ -63,16 +55,7 @@ Double DQN decouples action selection and evaluation by using two networks:
 
 - **Policy network** selects the best next action:
 
-\[
-a^* = \arg\max_{a'} Q(s', a'; \theta)
-\]
-
 - **Target network** evaluates that action:
-
-target = r + γ * max_a' Q(s', a'; θ)
-
-
-where \(\theta^-\) are the target network parameters.
 
 ### Benefits
 
@@ -80,19 +63,32 @@ where \(\theta^-\) are the target network parameters.
 - Improves learning stability
 - Leads to better policy performance
 
+## Architecture
 
-## What is Deep Q-Network (DQN)?
+### Double DQN
+```python
+# Action selection
+max_actions = policy_net(next_states).argmax(1)
+# Q-value evaluation
+target_q = target_net(next_states).gather(1, max_actions.unsqueeze(1)).squeeze()
+```
 
-Deep Q-Network (DQN) is a reinforcement learning algorithm that combines **Q-learning** with **deep neural networks** to solve problems with high-dimensional state spaces, such as video games or robotics tasks.
+## What is Dueling DQN?
 
-### Key Ideas
+Dueling DQN improves on regular DQN by separately estimating:
 
-- **Q-Learning**: A value-based RL method where the agent learns a function \( Q(s, a) \) that estimates the expected cumulative reward (return) when taking action \( a \) in state \( s \), and then following the best policy thereafter.
+![Dueling DQN](https://github.com/megashyam/reinforcement_LEarning/blob/main/space_exploration_with_DQN/Viz/dueling-dqn-framework.png)
 
-- **Deep Neural Network**: Instead of maintaining a Q-table (which is infeasible for large or continuous state spaces), DQN uses a neural network to approximate the Q-function \( Q(s, a; \theta) \), where \( \theta \) are the network weights.
+- The **state-value function** : how good it is to be in a given state regardless of action.
+- The **advantage function** : how much better taking a specific action is compared to the average action at that state.
 
----
+These are combined to get the Q-value
 
+### Advantages of Dueling DQN
+
+- Learns state values more efficiently, especially when actions have similar outcomes.
+- Helps the agent focus on states that matter, improving policy stability.
+- Produces more robust Q-value estimates, reducing variance in training.
 
 
 ## Architecture
@@ -122,34 +118,7 @@ class DuelingDQN(nn.Module):
 
 ```
 
-### Double DQN
-```python
-# Action selection
-max_actions = policy_net(next_states).argmax(1)
-# Q-value evaluation
-target_q = target_net(next_states).gather(1, max_actions.unsqueeze(1)).squeeze()
-```
-
-
-
-### How DQN Works
-
-- **State:** 8-dimensional vector representing position, velocity, angle, etc.
-- **Actions:** 4 discrete actions:
-  - 0: Do nothing
-  - 1: Fire left engine
-  - 2: Fire main engine
-  - 3: Fire right engine
-- **Neural Network:** Approximates Q-values for each action.
-- **Experience Replay:** Stores past experiences for stable training.
-- **Target Network:** A periodically updated network for stable Q-value targets.
-- **Double DQN (optional):** Reduces overestimation by using the policy network for action selection and the target network for evaluation.
-- **Dueling DQN (optional):** Separates state-value and advantage estimations for better learning.
-
----
-
-## 🗂️ Project Structure
-
+## Project Structure
 
 ```
 LunarLander-DQN/
