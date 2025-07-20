@@ -11,6 +11,7 @@ The LunarLander environment challenges an agent to land a spacecraft safely betw
 - Firing engines (-0.3 per frame)
 - Moving closer to the landing pad
 
+
 ![LunarLander Demo](https://github.com/megashyam/reinforcement_LEarning/blob/main/space_exploration_with_DQN/Viz/demo.gif)
 
 ## Features
