@@ -8,8 +8,8 @@ import torch
 import random
 from torch import nn
 
-from dqn import DQN
-from buffer import BufferMemory
+from dqn import DQN                     # Custom DQN model
+from buffer import BufferMemory         # Custom replay buffer
 
 from datetime import datetime, timedelta
 import argparse
@@ -30,6 +30,7 @@ matplotlib.use("Agg")
 class Falcon:
     def __init__(self, args):
 
+        # Load hyperparameters from YAML file
         with open("hyperparameters.yaml", "rb") as f:
             hpr = yaml.safe_load(f)
 
@@ -42,22 +43,22 @@ class Falcon:
         self.fc1_nodes = hpr["fc1_nodes"]
         self.fc_dueling = hpr["fc_dueling"]
         self.render = hpr["render"]
-
         self.target_sync_every = hpr["network_sync_rate"]
         self.mini_batch_size = hpr["mini_batch_size"]
         self.min_epsilon = hpr["min_epsilon"]
         self.enable_double_dqn = hpr["enable_double_dqn"]
         self.enable_dueling_dqn = hpr["enable_dueling_dqn"]
         self.show_every = hpr["show_every"]
-
+        
+        # File paths for logs, model and plots
         self.log_file = os.path.join(RUN_DIR, "logs.log")
         self.model_file = os.path.join(
             RUN_DIR, f'LunarLander_{datetime.now().strftime("%Y-%m-%d_%H-%M-%S")}.pt'
         )
-        self.graph_file = os.path.join(
-            RUN_DIR,
-            f"LunarLander_graph.png"
-        )
+        self.graph_file = os.path.join(RUN_DIR, f"LunarLander_graph.png")
+        
+
+        # Load model path if passed via CLI
         if args.model_file:
             self.model_path = os.path.join(RUN_DIR, args.model_file)
         else:
@@ -65,16 +66,15 @@ class Falcon:
 
         self.loss_fn = nn.SmoothL1Loss()
 
-        #self.best_loss = 
         self.n_states = None
         self.n_actions = None
 
     def run(self, is_training=False, render=False, model_path=None):
-
+        
+        # logging setup
         if is_training:
             start_time = datetime.now()
             last_graph_update_time = start_time
-
             log_msg = f"{start_time.strftime(DATE_FORMAT)}: Training..."
             print(log_msg)
 
@@ -83,16 +83,23 @@ class Falcon:
 
         env_name = "LunarLander-v3"
 
+        # Initializing environments
         if is_training:
             env_no_render = gym.make(env_name, render_mode=None)
             env_render = gym.make(env_name, render_mode="human")
         else:
             env_eval = gym.make(env_name, render_mode="human")
 
-        sample_env = env_render if (is_training and self.render) else env_eval if not is_training else env_no_render
+        # sample env to get dimensions
+        sample_env = (
+            env_render
+            if (is_training and self.render)
+            else env_eval if not is_training else env_no_render
+        )
         self.n_states = sample_env.observation_space.shape[0]
         self.n_actions = sample_env.action_space.n
 
+        #policy network
         policy_net = DQN(
             self.n_states,
             self.n_actions,
@@ -104,14 +111,15 @@ class Falcon:
         epsilon = self.epsilon_init
 
         if is_training:
-
+            # optimizer, buffer, and target net for training
             buff_mem = BufferMemory()
             self.optimizer = torch.optim.Adam(
                 policy_net.parameters(), lr=self.learning_rate
             )
 
             policy_net.train()
-
+            
+            # Target network
             target_net = DQN(
                 self.n_states,
                 self.n_actions,
@@ -128,15 +136,18 @@ class Falcon:
             loss_hist = []
             target_sync = 0
         else:
+             # Load pre-trained model for evaluation
             if self.model_path is None:
                 raise ValueError("Model path must be specified for evaluation.")
             policy_net.load_state_dict(torch.load(self.model_path))
             policy_net.eval()
-
+        
+        # main episode loop
         for episode in range(self.total_episodes):
-
+            
+            # render during training every show_every param
             if is_training:
-                do_render = (episode % self.show_every == 0)
+                do_render = episode % self.show_every == 0
                 env = env_render if do_render else env_no_render
                 if do_render:
                     print(f"Rendering on Episode:{episode}")
@@ -146,12 +157,13 @@ class Falcon:
             state, _ = env.reset()
             state = torch.tensor(state, dtype=torch.float, device=device)
             done = False
-
             step = 0
             episode_reward = 0.0
-
+            
+            # per step logic
             while step < self.total_steps_per_episode and not done:
-
+                
+                # Epsilon-greedy action selection
                 if is_training and random.random() < epsilon:
                     action = env.action_space.sample()
                     action = torch.tensor(action, device=device)
@@ -165,12 +177,10 @@ class Falcon:
                 reward = torch.tensor(reward, dtype=torch.float, device=device)
 
                 episode_reward += reward.item()
-
                 done = terminated or truncated
 
                 if is_training:
                     buff_mem.append((state, action, reward, next_state, terminated))
-                    
                     target_sync += 1
 
                 state = next_state
@@ -178,15 +188,16 @@ class Falcon:
                 if is_training and len(buff_mem) > self.mini_batch_size:
 
                     mini_batch = buff_mem.sample(self.mini_batch_size)
-
                     self.train_policy_net(mini_batch, policy_net, target_net)
+
                     epsilon = max(epsilon * self.epsilon_decay, self.min_epsilon)
                     epsilon_hist.append(epsilon)
 
                     if target_sync % self.target_sync_every == 0:
                         target_net.load_state_dict(policy_net.state_dict())
                         target_sync = 0
-
+                
+                # save best model
                 if is_training and episode_reward > best_reward:
                     log_msg = (
                         f"{datetime.now().strftime(DATE_FORMAT)}: New best reward: "
@@ -198,30 +209,29 @@ class Falcon:
 
                     with open(self.log_file, "w") as f:
                         f.write(log_msg + "\n")
-
                     torch.save(policy_net.state_dict(), self.model_file)
                     best_reward = episode_reward
-
+                
+                # Periodically update training graph
                 current_time = datetime.now()
-                if is_training and (current_time - last_graph_update_time > timedelta(seconds=2)):
+                if is_training and (
+                    current_time - last_graph_update_time > timedelta(seconds=2)
+                ):
                     self.save_graph(reward_per_episode, epsilon_hist)
                     last_graph_update_time = current_time
 
                 step += 1
 
-            # if is_training:
-        	   #  if do_render:
-        		  #   env.close()
             if is_training:
                 reward_per_episode.append(episode_reward)
-            #env.close()
-            
 
     def save_graph(self, reward_per_episode, epsilon_hist):
-
+        
+        # Create and save matplotlib plot for rewards & epsilon
         fig = plt.figure()
         mean_rewards = np.zeros(len(reward_per_episode))
-
+        
+        # moving avgerage rewards over 100 episodes
         for i in range(len(mean_rewards)):
             mean_rewards[i] = np.mean(reward_per_episode[max(0, i - 99) : (i + 1)])
 
@@ -241,7 +251,8 @@ class Falcon:
         plt.close(fig)
 
     def train_policy_net(self, mini_batch, policy_net, target_net):
-
+        
+        # unpack minibatch
         states, actions, rewards, next_states, terminated = zip(*mini_batch)
 
         states = torch.stack(states)
@@ -257,26 +268,37 @@ class Falcon:
         with torch.no_grad():
             if self.enable_double_dqn:
                 max_future_q = policy_net(new_state).argmax(dim=1)
-                target_q = (reward+ (1 - terminated)* self.discount* target_net(new_state).gather(dim=1, index=max_future_q.unsqueeze(1)).squeeze())
+                target_q = (
+                    reward
+                    + (1 - terminated)
+                    * self.discount
+                    * target_net(new_state)
+                    .gather(dim=1, index=max_future_q.unsqueeze(1))
+                    .squeeze()
+                )
 
             else:
-                target_q = (reward + (1 - terminated) * self.discount * target_net(new_state).max(dim=1)[0])
+                target_q = (
+                    reward
+                    + (1 - terminated)
+                    * self.discount
+                    * target_net(new_state).max(dim=1)[0]
+                )
 
         loss = self.loss_fn(current_q, target_q)
         self.optimizer.zero_grad()
         loss.backward()
-        #nn.utils.clip_grad_norm_(policy_net.parameters(), 1.0)
         self.optimizer.step()
 
-        # if self.best_loss > loss:
-        #     self.best_loss = loss
-
-
+# Entry point for CLI execution
 if __name__ == "__main__":
 
     parser = argparse.ArgumentParser(description="Train or Test Model")
     parser.add_argument("--train", help="Training Mode", action="store_true")
-    parser.add_argument("--model-file", type=str, help="Path to pretrained model to run",
+    parser.add_argument(
+        "--model-file",
+        type=str,
+        help="Path to pretrained model to run",
     )
     args = parser.parse_args()
 
